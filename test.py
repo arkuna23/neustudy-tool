@@ -1,20 +1,8 @@
-from argparse import ArgumentParser
 from asyncio import run
 from base64 import b64decode
 
 import aiofiles
 import cv2
-
-
-def init():
-    parser = ArgumentParser()
-    parser.add_argument(name="tenant", type=str, help="Tenant name")
-    parser.add_argument(name="username", type=str, help="Account username")
-    parser.add_argument(name="password", type=str, help="Account password")
-    parser.add_argument(name="proxy", type=str, help="Proxy address")
-    args = parser.parse_args()
-
-    run(main())
 
 
 async def main():
