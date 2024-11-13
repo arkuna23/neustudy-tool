@@ -1,36 +1,46 @@
 from asyncio import run
 from base64 import b64decode
 
-import aiofiles
-import cv2
+from aiohttp import ClientSession
+
+from _userinfo import *
+from src import LoginState, login
+from src.captcha import recognize_captcha
+
+
+async def check_test():
+    with (
+        open("test/bg.txt", newline=None) as bg,
+        open("test/target.txt", newline=None) as target,
+    ):
+        bg = bg.read()
+        target = target.read()
+        bg = b64decode(bg)
+        open("test/bg.png", "wb").write(bg)
+        target = b64decode(target)
+        open("test/target.png", "wb").write(target)
+        result = recognize_captcha(bg, target)
+        pos_percent = result.x / result.width  # 计算滑块的起始点在图片宽度的位置百分比
+        x = pos_percent * 310
+        print(x)
 
 
 async def main():
-    from src.ocr import OCRServer
-
-    async with aiofiles.open(
-        "./test/bg.txt", "r+", encoding="ascii"
-    ) as bg, aiofiles.open("./test/target.txt", "r+", encoding="ascii") as t:
-        bg_b64 = await bg.readline()
-        async with aiofiles.open("./test/bg.png", "wb") as f:
-            await f.write(b64decode(bg_b64))
-            await f.flush()
-        target_b64 = await t.readline()
-        async with aiofiles.open("./test/target.png", "wb") as f:
-            await f.write(b64decode(target_b64))
-            await f.flush()
-
-    async with OCRServer() as server:
-        resp = await server.slide_match(
-            bg_b64[0:-1],
-            target_b64[0:-1],
-        )
-        img = cv2.imread("./test/bg.png")
-        width = img.shape[1]
-        cv2.imwrite(
-            "./test/out.png",
-            img[resp.y1 : resp.y2, (width - resp.x2) : (width - resp.x1)],
-        )
+    async with ClientSession() as session:
+        login_gene = login(session, TENANT, USERNAME, PASSWORD)
+        async for state in login_gene:
+            match state:
+                case LoginState.GetCapcha:
+                    print("Getting captcha...")
+                case LoginState.RecognizeCapcha:
+                    print("Recognizing captcha...")
+                case LoginState.CheckCaptcha:
+                    print("Checking captcha...")
+                case LoginState.Login:
+                    print("Logging in...")
+                    break
+        info = await anext(login_gene)
+        print(info)
 
 
 if __name__ == "__main__":
