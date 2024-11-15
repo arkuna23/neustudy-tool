@@ -18,6 +18,7 @@ class SessionInfo:
     cookies: dict[str, Any]
 
     def set_session(self, session: ClientSession, update_cookies = False):
+        """Set session headers with this session info"""
         if update_cookies:
             session.cookie_jar.update_cookies(self.cookies)
         session.headers['Authorization'] = f"Bearer {self.accessToken}"

@@ -58,7 +58,6 @@ async def login_account(session: ClientSession, account: Account) -> SessionInfo
     assert sess_info
     return sess_info
 
-
 async def main():
     parser = ArgumentParser()
     parser.add_argument('--account', '-a', type=str, help="Your Account, format: tenant,username,password")
@@ -66,41 +65,58 @@ async def main():
     args = parser.parse_args()
     ensure_data_dir()
 
-    async with ClientSession(trust_env=True) as session:
-        if args.account:
-            account = parse_account(args.account)
-            sess_info = await login_account(session, account)
-        else:
-            sess_info = load_session_config(session)
-            if sess_info:
-                try:
-                    await get_unread_count(session)
-                except UnauthorizedException:
-                    warn("Session expired, re-login...")
-                    sess_info = None
+    async def load_acc_login() -> SessionInfo|None:
+        account = load_account()
+        if not account:
+            error("Could not find account config.")
+            warn("Please provide an account.")
+            print()
+            parser.print_help()
+            return
 
-            if not sess_info:
-                account = load_account()
-                if not account:
-                    error("Could not find account config.")
-                    warn("Please provide an account.")
-                    print()
-                    parser.print_help()
-                    return
-                sess_info = await login_account(session, account)
+        sess_info = await login_account(session, account)
+        return sess_info
 
+    async def process_action(sess_info: SessionInfo):
         if args.sign_all:
             count = 0
             async for course, _ in sign_all_courses(session, sess_info.userId):
                 count += 1
                 info(f"Signing {course.className}...")
-
             if count > 0:
                 success(f"Signed {count} courses.")
             else:
                 info("No courses to sign.")
         else:
             info("No action specified.")
+
+    async with ClientSession(trust_env=True) as session:
+        if args.account:
+            account = parse_account(args.account)
+            sess_info = await login_account(session, account)
+        else:
+            sess_info = load_session_config(session)
+            if not sess_info:
+                sess_info = await load_acc_login()
+            if not sess_info:
+                return
+
+        retry = 5
+        while retry >= 0:
+            try:
+                await process_action(sess_info)
+                break
+            except UnauthorizedException:
+                warn("Session expired, re-login...")
+
+                sess_info = await load_acc_login()
+                if not sess_info:
+                    return
+                retry -= 1
+            except Exception as e:
+                error(f"Error: {e}")
+                warn("Retrying...")
+                retry -= 1
 
 if __name__ == "__main__":
     run(main())

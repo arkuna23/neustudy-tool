@@ -21,6 +21,7 @@ class LoginState(Enum):
 async def login(
     session: ClientSession, account: Account, captcha_retry = 0
 ) -> AsyncGenerator[LoginState | tuple[SessionInfo, LoginInfo], None]:
+    """Login with account, return session info and login info, set session headers"""
     yield LoginState.GetTenant
     t_id = await get_tenant_id(session, account.tenant)
     session.headers["tenant-id"] = t_id
