@@ -1,11 +1,11 @@
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from asyncio import run
 
 from aiohttp import ClientSession
 from colorama import Fore
 
 from src import LoginState, login, sign_all_courses
-from src.api import UnauthorizedException, get_unread_count
+from src.api import UnauthorizedException
 from src.auth import Account, SessionInfo, load_account, load_session_config
 from src.util import ensure_data_dir
 
@@ -36,10 +36,12 @@ def parse_account(args: str) -> Account:
 async def login_account(session: ClientSession, account: Account) -> SessionInfo:
     """Login with account from command line arguments"""
 
-    login_gene = login(session, account, 5)
+    login_gene = login(session, account, 5, 5, 5)
     sess_info = None
     async for state in login_gene:
         match state:
+            case LoginState.GetTenant:
+                info("Getting tenant id...")
             case LoginState.GetCapcha:
                 info("Getting captcha...")
             case LoginState.RecognizeCapcha:
@@ -50,6 +52,10 @@ async def login_account(session: ClientSession, account: Account) -> SessionInfo
                 warn("Retrying captcha...")
             case LoginState.Login:
                 info("Logging in...")
+            case LoginState.RetryLogin:
+                warn("Retrying login...")
+            case LoginState.RetryTenant:
+                warn("Retrying get tenant id...")
             case r if isinstance(r, tuple):
                 sess_info = r[0]
                 sess_info.save()
